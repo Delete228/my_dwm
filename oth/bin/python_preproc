@@ -1,0 +1,298 @@
+#!/bin/python
+import sys
+import re
+
+
+class data:
+    def __init__(self, dt_name, file):
+        self.file = file
+        self.name = dt_name
+        self.count = 0
+        if self.name == "oth":
+            self.data = list()
+            self.data_to_update = dict()
+            self.__find_no_named__()
+        else:
+            self.data = ""
+            self.data_to_update = ""
+            self.__find_named__()
+
+    def flush(self, id=-1):
+        if self.name=="oth":
+            self.__flush_nonamed__(id)
+        else:
+            self.__flush_named__()
+
+    def __flush_named__(self):
+        lines=self.__dump_lines__()
+        (id, arg) = self.__get_named_tag_start__(lines)
+        if not id==-1:
+            id+=1
+            for a in arg:
+                None
+            while not self.__is_data_end__(lines[id]):
+                lines.pop(id)
+            lines[id:id]=self.data_to_update
+            with open(self.file, "w") as fl:
+                for i in range(len(lines)):
+                    fl.write(lines[i])
+                fl.flush()
+
+    def __flush_nonamed__(self, id):
+        print(id)
+        ids=None
+        lines=self.__dump_lines__()
+        if id==-1:
+            ids=range(len(self.data))
+        else:
+            ids=[id]
+        for i in ids:
+            print(i)
+            (id, arg) = self.__get_nonamed_tag_start__(lines, i)
+            id+=1
+            for a in arg:
+                None
+            while not self.__is_data_end__(lines[id]):
+                lines.pop(id)
+            lines[id:id]=self.data_to_update[i]
+        with open(self.file, "w") as fl:
+            for i in range(len(lines)):
+                fl.write(lines[i])
+            fl.flush()
+
+    def update(self, data, id=-1):
+        if self.name == "oth":
+            if id == -1:
+                if type(data) == list and len(data) == len(self.data):
+                    for i in range(len(self.data)):
+                        self.data_to_update[i] = data[i]
+            else:
+                if type(data) == str and id<len(self.data):
+                    self.data_to_update[id] = data
+        else:
+            if type(data) == str:
+                self.data_to_update = data
+
+    def __find_no_named__(self):
+        lines = self.__dump_lines__()
+        find_tag = False
+
+        count = 0
+        (id, arg) = self.__get_nonamed_tag_start__(lines, count)
+        while not id == -1:
+            self.data.append("")
+            id += 1
+            if self.__process_arg__(arg, id):
+                while not self.__is_data_end__(lines[id]):
+                    self.data[count] += lines[id]
+                    id += 1
+            count += 1
+            (id, arg) = self.__get_nonamed_tag_start__(lines, count)
+
+    def __find_named__(self):
+        lines = self.__dump_lines__()
+        find_name = False
+        (id, arg) = self.__get_named_tag_start__(lines)
+        if not id == -1:
+            id += 1
+            if not self.__process_arg__(arg, id):
+                return
+            while not self.__is_data_end__(lines[id]):
+                self.data += lines[id]
+                id += 1
+
+    def __get_named_tag_start__(self, lines):
+        for i in range(len(lines)):
+            if re.fullmatch("\/\/\[python_data.*start\]\(.*\).*\n", lines[i]):
+                arg = self.__get_arg__(lines[i])
+                if "name" in arg and arg["name"] == self.name:
+                    return (i, arg)
+        return (-1, dict())
+
+    def __get_nonamed_tag_start__(self, lines, id):
+        count = 0
+        for i in range(len(lines)):
+            if re.fullmatch("\/\/\[python_data.*start\].*\\n", lines[i]):
+                arg = self.__get_arg__(lines[i])
+                if not "name" in arg:
+                    if count == id:
+                        return (i, arg)
+                    count += 1
+        return (-1, dict())
+
+    def __is_data_end__(self, line):
+        if re.fullmatch("\/\/\[.*end\].*\n", line):
+            return True
+        else:
+            return False
+
+    def __dump_lines__(self):
+        lines = list()
+        with open(self.file, "r") as fl:
+            lines = fl.readlines()
+        return lines
+    def __process_arg__(self, arg, line):
+        for a in arg:
+            if a == "name":
+                None
+            elif a == "external":
+                if not self.name=="oth":
+                    vars=self.dump_var_name(arg[a])
+                    if self.name in vars["named"]:
+                        self.data = data(self.name, arg[a]).data
+                        self.file = arg[a]
+                    else:
+                        print("TAG '"+a+"' ERROR, NAME '"+self.name+"' NOT FOUND: "+str(line))
+
+                else:
+                    print("TAG '"+a+"' ERROR, NAME NOT DEFINED: "+str(line))
+                return False
+            else:
+                if not a=="":
+                    print("ARG '"+a+"' NOT FOUND: "+str(line))
+            None
+        return True
+
+    @staticmethod
+    def __get_arg__(string):
+        arg = re.search("\(.*\)", string)
+        if not arg:
+            return dict()
+        arg = re.sub("\(|\)", "", arg[0])
+        arg = arg.split(",")
+        arg_dict = dict()
+        for a in arg:
+            arg_dict[a.split("=", 1)[0].strip()] = a.split("=", 1)[-1].strip()
+        return arg_dict
+
+    @staticmethod
+    def dump_var_name(file):
+        lines = list()
+        with open(file, "r") as fl:
+            lines = fl.readlines()
+        name_vars = list()
+        count_no_name = 0
+        for i in range(len(lines)):
+            if re.fullmatch("\/\/\[python_data.*start\].*\n", lines[i]):
+                name_set = False
+                if re.fullmatch("\/\/\[.*\]\(.*\).*\n", lines[i]):
+                    arg_dict = data.__get_arg__(lines[i])
+                    if "name" in arg_dict:
+                        name_set = True
+                        name_vars.append(arg_dict["name"])
+                else:
+                    print("ARGS NOT FOUND: "+str(i+1))
+                if not name_set:
+                    count_no_name += 1
+
+        return {"named": name_vars, "nonamed": count_no_name}
+
+
+
+class code:
+    def __init__(self, file):
+        self.file = file
+        self.code = ""
+        self.__find_code__()
+
+    def __find_code__(self):
+        lines = self.__dump_lines__()
+
+        count = 0
+        id = self.__get_code_start__(lines, count)
+        while not id == -1:
+            id += 1
+            while not self.__is_code_end__(lines[id]):
+                self.code += lines[id]
+                id += 1
+            count += 1
+            id = self.__get_code_start__(lines, count)
+
+    def __get_code_start__(self, lines, id):
+        count = 0
+        for i in range(len(lines)):
+            if re.fullmatch("\/\/\[python_code.*start\].*\\n", lines[i]):
+                if count == id:
+                    return i
+                count += 1
+        return -1
+
+    def __is_code_end__(self, line):
+        if re.fullmatch("\/\/\[.*end\].*\n", line):
+            return True
+        else:
+            return False
+
+    def __dump_lines__(self):
+        lines = list()
+        with open(self.file, "r") as fl:
+            lines = fl.readlines()
+        return lines
+
+
+#dt = data.dump_var_name("tags.h")
+#print(dt)
+#for names in dt["named"]:
+#    m = data(names, "tags.h")
+#    print("tag '"+names+"' data")
+#    #print(m.data)
+#    m.update(m.data+"//test: "+m.name+"\n")
+#    #m.flush()
+#
+#m = data("oth", "tags.h")
+#print(m.data)
+#m.update([m.data[0]+"//test 1\n", m.data[1]+"//test 1\n"])
+##m.flush()
+#
+#c = code("tags.h")
+#print("code")
+#print(c.code)
+
+
+class file:
+    def __init__(self, name):
+        self.name=name
+        self.data_named=dict()
+        vars = data.dump_var_name(name)
+        for var in vars["named"]:
+            self.data_named[var] = data(var, self.name)
+        self.data_nonamed=data("oth", self.name)
+        self.code=code(self.name)
+
+    def print_code(self):
+        print("Code from '"+self.name+"':")
+        print(self.code.code)
+
+    def start(self):
+        data_names = ""
+        data_names += "this_file_name"+"="+"self.name\n"
+        data_names += "nonamed"+"="+"self.data_nonamed\n"
+        for nm in self.data_named:
+            data_names += nm+"="+"self.data_named[\""+nm+"\"]"
+            data_names += "\n"
+        # print(data_names)
+        print("\t\tfile start "+self.name)
+        exec(data_names+self.code.code)
+
+
+def create_data():
+    if len(sys.argv) == 1:
+        return
+    files = dict()
+    for i in range(1, len(sys.argv)):
+        files[sys.argv[i]] = (file(sys.argv[i]))
+    return files
+
+files = create_data()
+for name in files:
+    files[name].start()
+
+
+
+
+# files=create_data()
+# file_name="test"
+# for name in files:
+#    #files[name].print_data()
+#    #files[name].print_code()
+#    files[name].start()

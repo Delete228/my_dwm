@@ -1,0 +1,2 @@
+#!/bin/sh
+kill $(ps -eF | grep '\.exe' | awk '{print $2}')

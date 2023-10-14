@@ -1,0 +1,46 @@
+#!/bin/sh
+
+
+
+new_params=""
+for param in "$@"
+do
+if [[ ${param:0:1} == "-" ]] 
+then 
+        new_params="$new_params $param"
+else 
+        new_params="$new_params '$param'"
+fi
+done
+j4-dmenu-desktop --term='xterm' --display-binary --dmenu="(cat ; (stest -flx $(echo $PATH | tr : ' ') | sort -u)) | bemenu -i $new_params"
+
+#dmenumon=0
+#dmenufont="monospace:size=10"
+#col_gray1="#222222"
+#col_gray2="#444444"
+#col_gray3="#bbbbbb"
+#col_gray4="#eeeeee"
+#col_cyan="#005577"
+##-m $dmenumon -fn '$dmenufont' -nb '$col_gray1' -nf '$col_gray3' -sb '$col_cyan' -sf '$col_gray4'
+#while [ -n "$1" ]
+#do
+#case "$1" in
+#-m) dmenumon="$2"
+#shift ;;
+#-fn) dmenufont="$2" 
+#shift ;;
+#-nb) col_gray1="$2"
+#shift ;;
+#-nf) col_gray3="$2"
+#shift ;;
+#-sb) col_cyan="$2"
+#shift ;;
+#-sf) col_gray4="$2"
+#shift ;;
+#esac
+#shift
+#done
+##j4-dmenu-desktop --term='xterm' --display-binary --dmenu="(cat ; (stest -flx $(echo $PATH | tr : ' ') | sort -u)) | dmenu -i -m $dmenumon -fn '$dmenufont' -nb '$col_gray1' -nf '$col_gray3' -sb '$col_cyan' -sf '$col_gray4'"
+
+
+
